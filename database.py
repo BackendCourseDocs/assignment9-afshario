@@ -1,11 +1,15 @@
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import sessionmaker, declarative_base
+import os
+from dotenv import load_dotenv
 
-USER = "root"
-PASS = "1234"
-SERVER = "localhost"
-PORT = "3306"
-DB = "mysql"
+load_dotenv()
+
+USER = os.getenv("DB_USER")
+PASS = os.getenv("DB_PASS")
+SERVER = os.getenv("DB_SERVER")
+PORT = os.getenv("DB_PORT")
+DB = os.getenv("DB")
 
 engine = create_engine(
     f"mysql+pymysql://{USER}:{PASS}@{SERVER}:{PORT}/{DB}",
