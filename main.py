@@ -1,9 +1,11 @@
 from fastapi import FastAPI, Depends , Query
 from sqlalchemy.orm import Session
 from .model import  BookResponse,BookCreate
+import redis
 from .database import Base , engine , SessionLocal , BookDB
 
 app = FastAPI()
+redis_client = redis.Redis(host='localhost', port=6379, db=0)
 Base.metadata.create_all(bind=engine)
 
 def get_db():
@@ -18,6 +20,8 @@ async def create_book(  book: BookCreate, db: Session = Depends(get_db)):
       db_book = BookDB(**book.model_dump())
       db.add(db_book)
       db.commit()
+      if redis_client.get(book.name) is not None:
+            redis_client.delete(book.name)
       return db_book
 
 
@@ -28,16 +32,21 @@ async def search_books(
       page: int = Query(1, ge=1),
       size: int = Query(10, ge=1, le=50)
 ):
-
+      cached_item = redis_client.get(q)
+      if cached_item is not None:
+            return cached_item
       base = db.query(BookDB).filter(BookDB.name.like(f"%{q}%"))
       total = base.count()
       start = (page - 1) * size
       results = base.order_by(BookDB.id).offset(start).limit(size).all()     
-      return {
+      books_data = [{'id':book.id , 'name':book.name , 'author':book.author , 'year':book.year} for book in results]
+      res = {
             "total": total,
             "page": page,
-            "results": results
+            "results": books_data
       }
+      redis_client.set(q, res.__str__())
+      return res
 
 
 @app.get("/authors/search/")
